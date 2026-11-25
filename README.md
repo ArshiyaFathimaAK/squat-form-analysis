@@ -19,7 +19,7 @@ Put the videos in `videos/` as clip01.mp4 ... clip20.mp4.
 ## 3. Fill in clips.csv (one row per video)
 | column | example values |
 |---|---|
-| person | omar, arshiya, kiryang, anthony |
+| person | kiryang, anthony |
 | view | side or front (exactly these words) |
 | camera_angle | side_90, side_45, front_0 |
 | lighting | bright, dim |
