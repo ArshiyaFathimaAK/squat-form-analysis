@@ -18,7 +18,10 @@ import sys, json, time, glob, os
 os.environ.setdefault("GLOG_minloglevel", "2")       # hide MediaPipe INFO/WARNING spam
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 import numpy as np
-import pandas as pd
+try:
+    import pandas as pd
+except ModuleNotFoundError:
+    sys.exit("Missing dependency 'pandas'. Install it with: python -m pip install pandas")
 import cv2
 
 MODEL = "pose_landmarker_full.task"
@@ -26,8 +29,8 @@ MODEL = "pose_landmarker_full.task"
 L_SH, R_SH, L_HIP, R_HIP, L_KNEE, R_KNEE, L_ANK, R_ANK = 11, 12, 23, 24, 25, 26, 27, 28
 KEEP = [L_SH, R_SH, L_HIP, R_HIP, L_KNEE, R_KNEE, L_ANK, R_ANK]
 ERRORS = ["depth_err", "valgus_err", "lean_err"]
-# which camera view can see which error
-VIEW_FOR = {"depth_err": "side", "lean_err": "side", "valgus_err": "front"}
+# which camera views can see which error (depth shows in both: hip drops toward knee level)
+VIEW_FOR = {"depth_err": ("side", "front"), "lean_err": ("side",), "valgus_err": ("front",)}
 
 
 def make_landmarker():
@@ -119,9 +122,8 @@ class RepCounter:
 # ---------------------------------------------------------------- rules
 def predict(rep, th, view):
     """Rule-based errors. Only predicts errors visible from this view."""
-    p = {}
+    p = {"depth_err": int(rep["min_knee_angle"] > th["depth_err"])}
     if view == "side":
-        p["depth_err"] = int(rep["min_knee_angle"] > th["depth_err"])
         p["lean_err"] = int(rep["max_torso_lean"] > th["lean_err"])
     if view == "front":
         p["valgus_err"] = int(rep["min_knee_ankle_ratio"] < th["valgus_err"])
@@ -207,7 +209,7 @@ def cmd_calibrate():
     d = load_labeled(); cal = d[d.split == "calib"]
     th = {}
     for err, (feat, op) in FEATURE_FOR.items():
-        sub = cal[cal.view == VIEW_FOR[err]].dropna(subset=[err])
+        sub = cal[cal.view.isin(VIEW_FOR[err])].dropna(subset=[err])
         if sub.empty:
             th[err] = DEFAULT_TH[err]; continue
         best = (-1, -1, DEFAULT_TH[err])
@@ -226,7 +228,7 @@ def cmd_calibrate():
 def scores(d, th):
     rows = []
     for err in ERRORS:
-        sub = d[d.view == VIEW_FOR[err]].dropna(subset=[err])
+        sub = d[d.view.isin(VIEW_FOR[err])].dropna(subset=[err])
         if sub.empty:
             continue
         yhat = [predict(r, th, r["view"])[err] for _, r in sub.iterrows()]
