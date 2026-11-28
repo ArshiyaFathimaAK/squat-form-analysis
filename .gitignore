@@ -1,6 +1,4 @@
 venv/
-videos/*
-!videos/README.txt
 landmarks/
 __pycache__/
 *.task
